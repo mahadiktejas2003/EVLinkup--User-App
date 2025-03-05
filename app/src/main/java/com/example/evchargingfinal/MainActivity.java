@@ -222,7 +222,7 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
     Set<String> addedLocations = new HashSet<>();
 
     private void fetchNonRegisteredStations(double lat, double lng) {
-        String apiKey = "AIzaSyAEVQ0v49sMbRO23umRRr2PoCGD_DHFkHo";
+        String apiKey = getResources().getString(R.string.google_maps_api_key);
         String[] keywords = {"electric_vehicle_charging_station", "ev_charging", "charging_station", "electric_car_charging"};
 
         for (String keyword : keywords) {
