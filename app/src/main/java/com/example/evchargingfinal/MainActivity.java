@@ -37,6 +37,7 @@ import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.evchargingfinal.databinding.ActivityMainBinding;
 import com.google.android.gms.internal.maps.zzad;
+import com.google.android.gms.location.FusedLocationProviderClient;
 import com.google.android.gms.location.LocationCallback;
 import com.google.android.gms.location.LocationRequest;
 import com.google.android.gms.location.LocationResult;
@@ -64,13 +65,21 @@ import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.firestore.QueryDocumentSnapshot;
 import com.google.firebase.firestore.QuerySnapshot;
 
+import org.json.JSONArray;
+import org.json.JSONObject;
 import org.w3c.dom.Text;
 
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
+import java.net.HttpURLConnection;
+import java.net.URL;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 
 public class MainActivity extends AppCompatActivity implements OnMapReadyCallback {
 
@@ -81,7 +90,7 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
     ProgressBar progressBar;
     ResultReceiver resultReceiver;
     Owner owner;
-
+    FusedLocationProviderClient fusedLocationClient;
     LatLng userlocation,dlocation;
     private MarkerOptions place1, place2;
     Button getDirection;
@@ -107,60 +116,43 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
+        // Initialize Firebase Firestore
+        firebaseFirestore = FirebaseFirestore.getInstance();
 
-        resultReceiver = new AddressResultReceiver(new Handler());
+        // Initialize Google Maps
+        SupportMapFragment mapFragment = (SupportMapFragment) getSupportFragmentManager().findFragmentById(R.id.mapview);
+        if (mapFragment != null) {
+            mapFragment.getMapAsync(this);
+        }
 
+        // Initialize FusedLocationProviderClient
+        fusedLocationClient = LocationServices.getFusedLocationProviderClient(this);
 
-                getCurrentLocation1();
-                SupportMapFragment mapFragment = (SupportMapFragment) getSupportFragmentManager().findFragmentById(R.id.mapview);
+        // Initialize ProgressBar
+        progressBar = findViewById(R.id.progressBar);
 
-                if(mapFragment!=null)
-                {
-                    mapFragment.getMapAsync(MainActivity.this);
-                }
-
-
-        init();
-
-
-
-
+        // Check location permissions
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+            ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.ACCESS_FINE_LOCATION}, LOCATION_PERMISSION_REQUEST_CODE);
+        } else {
+            getCurrentLocation();
+        }
     }
-
-
-
-
-
 
     @Override
     public void onMapReady(@NonNull GoogleMap googleMap) {
         map = googleMap;
 
+        // Enable My Location layer
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
+            map.setMyLocationEnabled(true);
+        }
 
-
-
-        LatLng latLng = new LatLng(18.447265,73.858926);
-        LatLng latLng1 = new LatLng(18.467265,73.858926);
-
-
-        userlocation = latLng;
-
-
-
-
-
-        map.setOnMarkerClickListener(new GoogleMap.OnMarkerClickListener() {
-            @Override
-            public boolean onMarkerClick(Marker marker) {
-
-                showBottomSheetDialog(marker.getTag()+"");
-                return false; // Return false to indicate that we haven't consumed the event and default behavior should occur (i.e., show the info window)
-            }
+        // Set marker click listener
+        map.setOnMarkerClickListener(marker -> {
+            showBottomSheetDialog(marker);
+            return false; // Allow default behavior
         });
-
-
-
-
     }
 
     public void getCurrentLocation1()
@@ -177,7 +169,122 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
 //            Toast.makeText(this, "Vasudev", Toast.LENGTH_SHORT).show();
             getCurrentLocation();
         }
+        LocationRequest locationRequest = new LocationRequest();
+        locationRequest.setInterval(10000);
+        locationRequest.setFastestInterval(3000);
+        locationRequest.setPriority(LocationRequest.PRIORITY_HIGH_ACCURACY);
 
+        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED &&
+                ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+            return;
+        }
+
+        fusedLocationClient.getLastLocation().addOnSuccessListener(this, location -> {
+            if (location != null) {
+                lati = location.getLatitude();
+                longi = location.getLongitude();
+                LatLng userLocation = new LatLng(lati, longi);
+
+                // Move camera to user's location
+                map.moveCamera(CameraUpdateFactory.newLatLngZoom(userLocation, 12));
+
+                // Fetch and display registered stations
+                fetchRegisteredStations(lati, longi);
+
+                // Fetch and display non-registered stations
+                fetchNonRegisteredStations(lati, longi);
+            }
+        });
+
+    }
+    private void fetchRegisteredStations(double lat, double lng) {
+        firebaseFirestore.collection("Owner")
+                .get()
+                .addOnSuccessListener(querySnapshot -> {
+                    for (QueryDocumentSnapshot doc : querySnapshot) {
+                        Owner owner = doc.toObject(Owner.class);
+                        LatLng stationLocation = new LatLng(owner.getOwner_location().getLatitude(), owner.getOwner_location().getLongitude());
+
+                        // Add marker for registered station
+                        Marker marker = map.addMarker(new MarkerOptions()
+                                .position(stationLocation)
+                                .title(owner.getEv_station_name())
+                                .snippet("Registered Station")
+                                .icon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_GREEN)));
+
+                        // Tag the marker with the document ID
+                        marker.setTag(doc.getId());
+                    }
+                })
+                .addOnFailureListener(e -> Toast.makeText(this, "Error fetching registered stations", Toast.LENGTH_SHORT).show());
+    }
+
+    Set<String> addedLocations = new HashSet<>();
+
+    private void fetchNonRegisteredStations(double lat, double lng) {
+        String apiKey = "AIzaSyAEVQ0v49sMbRO23umRRr2PoCGD_DHFkHo";
+        String[] keywords = {"electric_vehicle_charging_station", "ev_charging", "charging_station", "electric_car_charging"};
+
+        for (String keyword : keywords) {
+            String url = "https://maps.googleapis.com/maps/api/place/nearbysearch/json?" +
+                    "location=" + lat + "," + lng +
+                    "&radius=5000" +
+                    "&type=electric_vehicle_charging_station" +
+                    "&keyword=" + keyword +
+                    "&key=" + apiKey;
+
+            new Thread(() -> {
+                try {
+                    URL obj = new URL(url);
+                    HttpURLConnection con = (HttpURLConnection) obj.openConnection();
+                    con.setRequestMethod("GET");
+
+                    BufferedReader in = new BufferedReader(new InputStreamReader(con.getInputStream()));
+                    StringBuilder response = new StringBuilder();
+                    String inputLine;
+
+                    while ((inputLine = in.readLine()) != null) {
+                        response.append(inputLine);
+                    }
+                    in.close();
+
+                    JSONObject jsonResponse = new JSONObject(response.toString());
+                    JSONArray results = jsonResponse.getJSONArray("results");
+
+                    for (int i = 0; i < results.length(); i++) {
+                        JSONObject station = results.getJSONObject(i);
+                        JSONObject geometry = station.getJSONObject("geometry");
+                        JSONObject location = geometry.getJSONObject("location");
+
+                        double stationLat = location.getDouble("lat");
+                        double stationLng = location.getDouble("lng");
+                        LatLng stationLocation = new LatLng(stationLat, stationLng);
+
+                        String stationName = station.optString("name", "Unnamed Station");
+
+                        // Create a unique key for the location
+                        String locationKey = stationLat + "," + stationLng;
+
+                        // Check if the location is already added
+                        if (!addedLocations.contains(locationKey)) {
+                            addedLocations.add(locationKey);
+
+                            runOnUiThread(() -> {
+                                Marker marker = map.addMarker(new MarkerOptions()
+                                        .position(stationLocation)
+                                        .title(stationName)
+                                        .snippet("Non-Registered Station") // Set snippet to identify
+                                        .icon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_BLUE)));
+                                // Store coordinates in the tag as a string
+                                marker.setTag(stationLat + "," + stationLng);
+                            });
+                        }
+                    }
+                } catch (Exception e) {
+                    Log.e("MainActivity", "Error fetching non-registered stations", e);
+                }
+            }).start();
+        }
     }
 
     @Override
@@ -193,76 +300,50 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
     }
 
     private void getCurrentLocation() {
-//        progressBar.setVisibility(View.VISIBLE);
-//        Toast.makeText(this, "getcurrentLocation", Toast.LENGTH_SHORT).show();
+        progressBar.setVisibility(View.VISIBLE); // Show ProgressBar
 
         LocationRequest locationRequest = null;
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
             locationRequest = new LocationRequest();
         }
-        locationRequest.setInterval(10000);
-        locationRequest.setFastestInterval(3000);
-        locationRequest.setPriority(LocationRequest.PRIORITY_HIGH_ACCURACY);
 
-        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED && ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+        if (locationRequest != null) {
+            locationRequest.setInterval(10000);
+            locationRequest.setFastestInterval(3000);
+            locationRequest.setPriority(LocationRequest.PRIORITY_HIGH_ACCURACY);
 
-            return;
-        }
+            if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED &&
+                    ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+                progressBar.setVisibility(View.GONE); // Hide ProgressBar if permissions are missing
+                return;
+            }
 
+            LocationServices.getFusedLocationProviderClient(MainActivity.this)
+                    .requestLocationUpdates(locationRequest, new LocationCallback() {
+                        @Override
+                        public void onLocationResult(LocationResult locationResult) {
+                            super.onLocationResult(locationResult);
+                            LocationServices.getFusedLocationProviderClient(getApplicationContext())
+                                    .removeLocationUpdates(this);
 
-        LocationServices.getFusedLocationProviderClient(MainActivity.this)
-                .requestLocationUpdates(locationRequest, new LocationCallback() {
+                            if (locationResult != null && locationResult.getLocations().size() > 0) {
+                                int latestlocIndex = locationResult.getLocations().size() - 1;
+                                lati = locationResult.getLocations().get(latestlocIndex).getLatitude();
+                                longi = locationResult.getLocations().get(latestlocIndex).getLongitude();
+                                LatLng userLocation = new LatLng(lati, longi);
 
-                    @Override
-                    public void onLocationResult(LocationResult locationResult) {
-                        super.onLocationResult(locationResult);
-                        LocationServices.getFusedLocationProviderClient(getApplicationContext())
-                                .removeLocationUpdates(this);
-//                        Toast.makeText(MainActivity.this, "when set locatin", Toast.LENGTH_SHORT).show();
-                        if (locationResult != null && locationResult.getLocations().size() > 0) {
-                            int latestlocIndex = locationResult.getLocations().size() - 1;
-                            lati = locationResult.getLocations().get(latestlocIndex).getLatitude();
-                            longi = locationResult.getLocations().get(latestlocIndex).getLongitude();
-                            LatLng latLng2 = new LatLng(lati,longi);
-                            map.addMarker(new MarkerOptions().position(latLng2).title("I am here"));
+                                map.addMarker(new MarkerOptions().position(userLocation).title("I am here"));
+                                map.moveCamera(CameraUpdateFactory.newLatLngZoom(userLocation, 12));
 
+                                fetchRegisteredStations(lati, longi);
+                                fetchNonRegisteredStations(lati, longi);
+                            }
 
-                            map.addCircle(new CircleOptions()
-                                    .center(latLng2)
-                                    .radius(1000) // Radius in meters
-                                    .strokeWidth(2)
-                                    .strokeColor(Color.BLUE)
-                                    .fillColor(Color.argb(70, 0, 0, 255)));
-
-                            map.addCircle(new CircleOptions()
-                                    .center(latLng2)
-                                    .radius(50000) // Radius in meters
-                                    .strokeWidth(2)
-                                    .strokeColor(Color.BLUE)
-                                    .fillColor(Color.argb(20, 0, 0, 20)));
-
-
-
-                            map.moveCamera(CameraUpdateFactory.newLatLng(latLng2));
-//
-                            map.moveCamera(CameraUpdateFactory.zoomTo(12f));
-                            map.animateCamera(CameraUpdateFactory.zoomTo(12f));
-
-
-
-
-
-                            getData1();
-
-                        } else {
-//                            progressBar.setVisibility(View.GONE);
-
+                            progressBar.setVisibility(View.GONE); // Hide ProgressBar after fetching data
                         }
-                    }
-                }, Looper.getMainLooper());
-
+                    }, Looper.getMainLooper());
+        }
     }
-
     private class AddressResultReceiver extends ResultReceiver {
         public AddressResultReceiver(Handler handler) {
             super(handler);
@@ -283,349 +364,103 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
 
     }
 
-    public void showBottomSheetDialog(String tag)
-    {
-
+    public void showBottomSheetDialog(Marker marker) {
         final BottomSheetDialog bottomSheetDialog1 = new BottomSheetDialog(
-                MainActivity.this,R.style.BottomSheetDialogTheme
+                MainActivity.this, R.style.BottomSheetDialogTheme
         );
 
+        View bottomSheetView = getLayoutInflater().inflate(
+                R.layout.layout_bottom_sheet,
+                findViewById(R.id.bottomsheetcontainer)
+        );
 
-        View bottomSheetView = LayoutInflater.from(MainActivity.this)
-                .inflate(
-                        R.layout.layout_bottom_sheet,
-                        (LinearLayout)findViewById(R.id.bottomsheetcontainer)
-                );
-        Owner allowner = mp.get(tag);
-
-
-//
-        TextView stationname = bottomSheetView.findViewById(R.id.stationname);
-        TextView price,remainingEnergy,address;
-
-
-        TextView avg = bottomSheetView.findViewById(R.id.avgr);
-        avg.setText(allowner.getAvg_rating()+"");
-
-
-//        Toast.makeText(this, ""+allowner.getPrice(), Toast.LENGTH_SHORT).show();
-        price = bottomSheetView.findViewById(R.id.price);
-        remainingEnergy = bottomSheetView.findViewById(R.id.remainingenergy);
-        address = bottomSheetView.findViewById(R.id.address);
-//        Toast.makeText(this, ""+ Integer.toHexString(System.identityHashCode(allowner.getOwner_location())), Toast.LENGTH_SHORT).show();
-        price.setText(allowner.getPrice()+"");
-
-//        Toast.makeText(this, "Address :"+getAddress(allowner.getOwner_location().getLatitude(),allowner.getOwner_location().getLongitude()) , Toast.LENGTH_SHORT).show();
-//        remainingEnergy.setText(allowner.get);
-        address.setText(getAddress(allowner.getOwner_location().getLatitude(),allowner.getOwner_location().getLongitude()));
-        stationname.setText(allowner.getOwner_name());
-
-
-
-
-
-        Button direction= bottomSheetView.findViewById(R.id.btnUpdate);
+        TextView stationName = bottomSheetView.findViewById(R.id.stationname);
+        TextView price = bottomSheetView.findViewById(R.id.price);
+        TextView remainingEnergy = bottomSheetView.findViewById(R.id.remainingenergy);
+        TextView address = bottomSheetView.findViewById(R.id.address);
+        Button direction = bottomSheetView.findViewById(R.id.btnUpdate);
         Button book = bottomSheetView.findViewById(R.id.book);
 
-//        t.setText(names.getOwner_name());
-
-
-        //--------------------------------------write heare bottom sheet variable names------------------------
-
-
-//        TextView button = findViewById(R.id.name);
-//        book.setOnClickListener(new View.OnClickListener() {
-//            @Override
-//            public void onClick(View v) {
-//                Intent intent  = new Intent(getApplicationContext(),BookSlot.class);
-//                startActivity(intent);
-//            }
-//        });
-//
-//
-//
-//
-//        direction.setOnClickListener(new View.OnClickListener() {
-//            @Override
-//            public void onClick(View v) {
-//
-//                String origin = lati+","+longi; // New York coordinates
-//                String destination = mp.get(tag).getOwner_location().getLatitude()+","+mp.get(tag).getOwner_location().getLongitude(); // Los Angeles coordinates
-//                Uri gmmIntentUri = Uri.parse("http://maps.google.com/maps?saddr=" + origin + "&daddr=" + destination);
-//                Intent mapIntent = new Intent(Intent.ACTION_VIEW, gmmIntentUri);// Set the package to Google Maps
-//                mapIntent.setPackage("com.google.android.apps.maps");
-//                if (mapIntent.resolveActivity(getPackageManager()) != null) {
-//                    startActivity(mapIntent);
-//                }
-//
-//            }
-//        });
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//        firebaseFirestore
-//                .collection("Owner")
-//                .document(allowner.getOwner_email())
-//                .collection("EV_Station")
-//                .get()
-//                .addOnSuccessListener(new OnSuccessListener<QuerySnapshot>() {
-//                    @Override
-//                    public void onSuccess(QuerySnapshot snaps) {
-//                        if (snaps == null) return;
-//                        evStations.addAll(snaps.toObjects(EVStation.class));
-//                        int enrgy = 0 ;
-//                        for(int i = 0 ; i < evStations.size();i++)
-//                        {
-//                            enrgy+=evStations.get(i).getEvs_energy();
-//                        }
-//                                remainingEnergy.setText(enrgy+"");
-//
-//
-//
-////                        Toast.makeText(MainActivity.this, ""+evStations.get(0).evs_energy, Toast.LENGTH_SHORT).show();
-//                    }
-//                }).addOnFailureListener(new OnFailureListener() {
-//                    @Override
-//                    public void onFailure(@NonNull Exception e) {
-//                        Toast.makeText(MainActivity.this, e.getMessage(), Toast.LENGTH_SHORT).show();
-//                    }
-//                });
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-
-        book.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-
-
-
-
-                firebaseFirestore
-                        .collection("Owner")
-                        .document(allowner.getOwner_email())
-                        .collection("EV_Station")
-                        .get()
-                        .addOnSuccessListener(new OnSuccessListener<QuerySnapshot>() {
-                            @Override
-                            public void onSuccess(QuerySnapshot snaps) {
-                                if (snaps == null) return;
-                                evStations.addAll(snaps.toObjects(EVStation.class));
-                                int enrgy = 0 ;
-                                for(int i = 0 ; i < evStations.size();i++)
-                                {
-                                    if(evStations.get(i).getEvs_energy()>(allowner.getPrice()*30))
-                                    {
-
-                                        Intent intent  = new Intent(MainActivity.this,BookSlot.class);
-//                                                    Toast.makeText(context, ""+dataholder2.get(position).getPrice(), Toast.LENGTH_SHORT).show();
-                                        intent.putExtra("owner_email",allowner.getOwner_email());
-                                        intent.putExtra("price",allowner.getPrice()+"");
-//                                                    Toast.makeText(context, ""+dataholder2.get(position).getOwner_name(), Toast.LENGTH_SHORT).show();
-                                        intent.putExtra("owner_name",allowner.getOwner_name());
-                                        startActivity(intent);
-
-
-                                    }
-
-
-
-
-
-
-                                }
-//                                            remainingEnergy.setText(enrgy+"");
-
-
-
-//                        Toast.makeText(MainActivity.this, ""+evStations.get(0).evs_energy, Toast.LENGTH_SHORT).show();
-                            }
-                        }).addOnFailureListener(new OnFailureListener() {
-                            @Override
-                            public void onFailure(@NonNull Exception e) {
-                                Toast.makeText(MainActivity.this, e.getMessage(), Toast.LENGTH_SHORT).show();
-                            }
-                        });
-
-
-
-
-
-
-
-
-
-
-
-            }
-        });
-
-
-
-
-
-
-        direction.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-
-//                Toast.makeText(MainActivity.this, ""+allowner.getLat()+","+allowner.getLang(), Toast.LENGTH_SHORT).show();
-
-                String origin = lati+","+longi; // New York coordinates
-                String destination = allowner.getOwner_location().getLatitude()+","+allowner.getOwner_location().getLongitude(); // Los Angeles coordinates
-
-
-
-                // Call the method to show directions
-//        MapsHelper.showDirections(this, origin, destination);
-
-                Uri gmmIntentUri = Uri.parse("http://maps.google.com/maps?saddr=" + origin + "&daddr=" + destination);
-
-                // Create an Intent with the Uri
-                Intent mapIntent = new Intent(Intent.ACTION_VIEW, gmmIntentUri);
-
-                // Set the package to Google Maps
-                mapIntent.setPackage("com.google.android.apps.maps");
-
-                // Check if there's an app to handle this intent
-                if (mapIntent.resolveActivity(getPackageManager()) != null) {
-                    // Start Google Maps with the intent
-                    startActivity(mapIntent);
-                }
-
-
-
-
-
-
-
-
-            }
-        });
-
-
-
-
-
-
-
-
-
-
-
-
-
-        firebaseFirestore
-                .collection("Owner")
-                .document()
-                .collection("EV_Station")
-                .get()
-                .addOnSuccessListener(new OnSuccessListener<QuerySnapshot>() {
-                    @Override
-                    public void onSuccess(QuerySnapshot snaps) {
-                        if (snaps == null) return;
-                        evStations.addAll(snaps.toObjects(EVStation.class));
-                        int enrgy = 0 ;
-                        for(int i = 0 ; i < evStations.size();i++)
-                        {
-                            enrgy+=evStations.get(i).getEvs_energy();
+        String snippet = marker.getSnippet();
+        String tag = marker.getTag() != null ? marker.getTag().toString() : "";
+        String title = marker.getTitle();
+
+        // Check if the station is registered
+        if ("Registered Station".equals(snippet)) {
+            // Fetch registered station details from Firestore
+            firebaseFirestore.collection("Owner").document(tag).get()
+                    .addOnSuccessListener(documentSnapshot -> {
+                        Owner owner = documentSnapshot.toObject(Owner.class);
+                        if (owner != null) {
+                            // Populate registered station data
+                            stationName.setText(owner.getEv_station_name());
+                            price.setText(String.valueOf(owner.getPrice()));
+                            address.setText(getAddress(owner.getOwner_location().getLatitude(), owner.getOwner_location().getLongitude()));
+
+                            // Directions for registered
+                            direction.setOnClickListener(v -> {
+                                String origin = lati + "," + longi;
+                                String dest = owner.getOwner_location().getLatitude() + "," + owner.getOwner_location().getLongitude();
+                                openGoogleMaps(origin, dest);
+                            });
                         }
-                        remainingEnergy.setText(enrgy+"");
-
-
-
-//                        Toast.makeText(MainActivity.this, ""+evStations.get(0).evs_energy, Toast.LENGTH_SHORT).show();
-                    }
-                }).addOnFailureListener(new OnFailureListener() {
-                    @Override
-                    public void onFailure(@NonNull Exception e) {
-                        Toast.makeText(MainActivity.this, e.getMessage(), Toast.LENGTH_SHORT).show();
-                    }
-                });
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+                    })
+                    .addOnFailureListener(e -> handleUnregisteredStation(marker, bottomSheetView, stationName, address, direction));
+        } else {
+            // Handle unregistered station
+            handleUnregisteredStation(marker, bottomSheetView, stationName, address, direction);
+        }
 
         bottomSheetDialog1.setContentView(bottomSheetView);
         bottomSheetDialog1.show();
     }
 
+    private void handleUnregisteredStation(Marker marker, View bottomSheetView, TextView stationName, TextView address, Button direction) {
+        String tag = marker.getTag().toString();
+        String[] coords = tag.split(",");
+        if (coords.length == 2) {
+            double lat = Double.parseDouble(coords[0]);
+            double lng = Double.parseDouble(coords[1]);
 
-    private String getAddress(double lati,double longi) {
+            // Set station name from marker's title
+            stationName.setText(marker.getTitle());
+            address.setText(getAddress(lat, lng));
 
+            // Directions for unregistered
+            direction.setOnClickListener(v -> {
+                String origin = lati + "," + longi;
+                String dest = lat + "," + lng;
+                openGoogleMaps(origin, dest);
+            });
+        }
+        // Hide price and disable booking
+        bottomSheetView.findViewById(R.id.price).setVisibility(View.GONE);
+        bottomSheetView.findViewById(R.id.book).setVisibility(View.GONE);
+    }
+
+    private void openGoogleMaps(String origin, String destination) {
+        Uri gmmIntentUri = Uri.parse("http://maps.google.com/maps?saddr=" + origin + "&daddr=" + destination);
+        Intent mapIntent = new Intent(Intent.ACTION_VIEW, gmmIntentUri);
+        mapIntent.setPackage("com.google.android.apps.maps");
+        if (mapIntent.resolveActivity(getPackageManager()) != null) {
+            startActivity(mapIntent);
+        }
+    }
+
+
+    private String getAddress(double lati, double longi) {
         String add = "";
-
         try {
-            Geocoder geocoder;
-            List<Address> addresses;
-            geocoder = new Geocoder(this, Locale.getDefault());
-
-            addresses = geocoder.getFromLocation(lati, longi, 1); // Here 1 represent max location result to returned, by documents it recommended 1 to 5
-
-            add = addresses.get(0).getAddressLine(0);
+            Geocoder geocoder = new Geocoder(this, Locale.getDefault());
+            List<Address> addresses = geocoder.getFromLocation(lati, longi, 1);
+            if (addresses != null && !addresses.isEmpty()) {
+                add = addresses.get(0).getAddressLine(0);
+            }
         } catch (Exception e) {
             Toast.makeText(this, e.getMessage(), Toast.LENGTH_SHORT).show();
         }
-
         return add;
     }
-
 
 
 

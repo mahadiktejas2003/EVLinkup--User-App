@@ -18,6 +18,12 @@
         android:layout_height="match_parent"
         android:background="@color/cl_black"
         tools:context=".MapsActivity" />
+    <ProgressBar
+        android:id="@+id/progressBar"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:visibility="gone"
+         android:layout_gravity="center" />
 
     <TextView
         android:id="@+id/label"

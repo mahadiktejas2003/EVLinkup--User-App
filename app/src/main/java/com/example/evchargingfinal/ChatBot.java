@@ -25,15 +25,5 @@ public class ChatBot extends AppCompatActivity {
         // Load a URL into the WebView
         webView.loadUrl("https://ecoviewproperties.in/PCCOE/index.html");
 
-
-
-
-
-
-
-
-
-
-
     }
 }
