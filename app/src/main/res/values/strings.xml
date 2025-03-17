@@ -10,5 +10,5 @@
     <string name="dictrict">District: </string>
     <string name="ques">  </string>
     <string name="apikey">AIzaSyCK8gAGTkX6cSZGYiYkP4PcxVwYla_6iOE</string>
-    <string name="google_maps_api_key" translatable="false">${MAPS_API_KEY}</string>
+    <string name="google_maps_api_key">AIzaSyAEVQ0v49sMbRO23umRRr2PoCGD_DHFkHo</string>
 </resources>
