@@ -48,6 +48,7 @@ import com.google.android.gms.tasks.OnSuccessListener;
 import com.google.android.material.bottomsheet.BottomSheetDialog;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.firestore.FirebaseFirestore;
+import com.google.firebase.firestore.GeoPoint;
 import com.google.firebase.firestore.QueryDocumentSnapshot;
 import com.google.firebase.firestore.QuerySnapshot;
 
@@ -514,67 +515,38 @@ public class ALLEVList extends AppCompatActivity {
 
 
 
-    public void setStation1()
-    {
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-//        data_list = new ArrayList<>();
+    public void setStation1() {
         data_list = new ArrayList<>();
         firebaseFirestore.collection("Owner")
-            .get()
+                .get()
                 .addOnSuccessListener(new OnSuccessListener<QuerySnapshot>() {
-        @Override
-        public void onSuccess(QuerySnapshot queryDocumentSnapshots) {
-            for (QueryDocumentSnapshot doc : queryDocumentSnapshots) {
-                Owner owner = doc.toObject(Owner.class);
-                LatLng latLng2 = new LatLng(owner.getOwner_location().getLatitude(), owner.getOwner_location().getLongitude());
+                    @Override
+                    public void onSuccess(QuerySnapshot queryDocumentSnapshots) {
+                        for (QueryDocumentSnapshot doc : queryDocumentSnapshots) {
+                            Owner owner = doc.toObject(Owner.class);
+                            GeoPoint ownerLocation = owner.getOwner_location();
 
+                            if (ownerLocation != null) {
+                                LatLng latLng2 = new LatLng(ownerLocation.getLatitude(), ownerLocation.getLongitude());
+                                data_list.add(new Owner(owner.getOwner_id(), owner.owner_email, owner.owner_name, owner.ev_station_name, owner.avg_rating, ownerLocation, owner.charging_points, owner.price, owner.charging_point_com_type_1, owner.charging_point_com_type_2, owner.charging_point_com_type_3, owner.reviews, owner.lat, owner.lang));
 
-
-
-
-                data_list.add(new Owner(owner.getOwner_id(), owner.owner_email, owner.owner_name, owner.ev_station_name, owner.avg_rating, owner.getOwner_location(), owner.charging_points,owner.price,owner.charging_point_com_type_1, owner.charging_point_com_type_2, owner.charging_point_com_type_3, owner.reviews,owner.lat,owner.lang));
-//
-
-
-
-                dishAdapter = new StationAdapter(data_list, ALLEVList.this);
-                recyclerView.setAdapter(dishAdapter);
-                TextView label  = findViewById(R.id.label);
-
-                double red = calculateDistance(lati,longi,latLng2.latitude,latLng2.longitude);
-
-
-            }
-        }
-    })
-            .addOnFailureListener(new OnFailureListener() {
-        @Override
-        public void onFailure(@NonNull Exception e) {
-//                        Toast.makeText(MainActivity.this, e.getMessage(), Toast.LENGTH_SHORT).show();
-        }
-    });
-
-
-
-
-
-
-
-
-}
+                                double red = calculateDistance(lati, longi, latLng2.latitude, latLng2.longitude);
+                            } else {
+                                Log.d("ALLEVList", "Owner location is null for owner: " + owner.getOwner_id());
+                                Toast.makeText(ALLEVList.this, "Location data is not available for owner: " + owner.getOwner_id(), Toast.LENGTH_SHORT).show();
+                            }
+                        }
+                        dishAdapter = new StationAdapter(data_list, ALLEVList.this);
+                        recyclerView.setAdapter(dishAdapter);
+                    }
+                })
+                .addOnFailureListener(new OnFailureListener() {
+                    @Override
+                    public void onFailure(@NonNull Exception e) {
+                        Toast.makeText(ALLEVList.this, e.getMessage(), Toast.LENGTH_SHORT).show();
+                    }
+                });
+    }
 
     private void init(){
         firebaseAuth = FirebaseAuth.getInstance();

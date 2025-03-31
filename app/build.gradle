@@ -5,7 +5,7 @@ plugins {
 
 android {
     namespace 'com.example.evchargingfinal'
-    compileSdk 33
+    compileSdk 34 // Updated from 33 to 34 (or 35)
 
     defaultConfig {
         applicationId "com.example.evchargingfinal"
@@ -37,17 +37,26 @@ dependencies {
     implementation 'androidx.appcompat:appcompat:1.6.1'
     implementation 'com.google.android.material:material:1.5.0'
     implementation 'androidx.constraintlayout:constraintlayout:2.1.4'
-    implementation 'com.google.firebase:firebase-firestore:24.10.2'
-    implementation 'com.google.firebase:firebase-messaging:23.1.0'
+
+    // Import the Firebase BoM
+    implementation platform('com.google.firebase:firebase-bom:33.11.0')
+
+    // Add the dependencies for Firebase products you want to use
+    // When using the BoM, don't specify versions in Firebase dependencies
+    implementation 'com.google.firebase:firebase-analytics'
+    implementation 'com.google.firebase:firebase-firestore'
+    implementation 'com.google.firebase:firebase-messaging'
+    implementation 'com.google.firebase:firebase-auth'
+
     testImplementation 'junit:junit:4.13.2'
     androidTestImplementation 'androidx.test.ext:junit:1.1.5'
     androidTestImplementation 'androidx.test.espresso:espresso-core:3.5.1'
-    implementation 'com.google.android.gms:play-services-maps:18.2.0'
+
+    implementation 'com.google.android.gms:play-services-maps:18.2.0' //Update to latest version if possible.
     implementation 'androidx.legacy:legacy-support-v4:1.0.0'
-    implementation 'com.google.android.gms:play-services-location:17.0.0'
-    implementation 'com.google.maps:google-maps-services:0.15.0'
+    implementation 'com.google.android.gms:play-services-location:21.1.0' //Update to latest version if possible.
+    implementation 'com.google.maps:google-maps-services:2.2.0' //Update to latest version if possible.
     implementation 'de.hdodenhof:circleimageview:3.1.0'
-    implementation 'com.google.firebase:firebase-auth:21.0.3'
     implementation 'com.github.mancj:MaterialSearchBar:0.8.5'
     implementation 'me.zhanghai.android.materialratingbar:library:1.4.0'
     implementation 'com.airbnb.android:lottie:6.3.0'

@@ -5,6 +5,7 @@ import com.google.firebase.firestore.GeoPoint;
 public class Owner {
     String owner_id, owner_email, owner_name, ev_station_name;
     double avg_rating;
+    private double amount_earned;
     private GeoPoint owner_location;
     int charging_points, price, charging_point_com_type_1, charging_point_com_type_2, charging_point_com_type_3, reviews;
 
@@ -14,7 +15,7 @@ public class Owner {
     public Owner() {
     }
 
-    public Owner(String owner_id, String owner_email, String owner_name, String ev_station_name, double avg_rating, GeoPoint owner_location, int charging_points, int price, int charging_point_com_type_1, int charging_point_com_type_2, int charging_point_com_type_3, int reviews) {
+    public Owner(String owner_id, String owner_email, String owner_name, String ev_station_name, double avg_rating, GeoPoint owner_location, int charging_points, int price, int charging_point_com_type_1, int charging_point_com_type_2, int charging_point_com_type_3, int reviews, double amount_earned) {
         this.owner_id = owner_id;
         this.owner_email = owner_email;
         this.owner_name = owner_name;
@@ -27,6 +28,8 @@ public class Owner {
         this.charging_point_com_type_2 = charging_point_com_type_2;
         this.charging_point_com_type_3 = charging_point_com_type_3;
         this.reviews = reviews;
+        this.amount_earned = amount_earned;
+
     }
 
 
@@ -137,12 +140,15 @@ public class Owner {
 
     public int getReviews() {
         return reviews;
-    }
+    } // Keep this
 
     public double getLat() {
         return lat;
     }
 
+    public double getAmount_earned() {  // Add this getter
+        return amount_earned;
+    }
     public void setLat(double lat) {
         this.lat = lat;
     }
@@ -150,7 +156,9 @@ public class Owner {
     public double getLang() {
         return lang;
     }
-
+    public void setAmount_earned(double amount_earned) {
+        this.amount_earned = amount_earned;
+    }
     public void setLang(double lang) {
         this.lang = lang;
     }

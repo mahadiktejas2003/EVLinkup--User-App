@@ -203,8 +203,24 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
                 .addOnSuccessListener(querySnapshot -> {
                     for (QueryDocumentSnapshot doc : querySnapshot) {
                         Owner owner = doc.toObject(Owner.class);
-                        LatLng stationLocation = new LatLng(owner.getOwner_location().getLatitude(), owner.getOwner_location().getLongitude());
 
+                        // Add null check for owner_location
+                        if (owner.getOwner_location() == null) {
+                            Log.e("Firestore", "Location missing for: " + owner.getEv_station_name());
+                            continue; // Skip this document
+                        }
+
+                        LatLng stationLocation = new LatLng(
+                                owner.getOwner_location().getLatitude(),
+                                owner.getOwner_location().getLongitude()
+                        );
+
+// Add validation for valid coordinate ranges
+                        if (Math.abs(stationLocation.latitude) > 90 ||
+                                Math.abs(stationLocation.longitude) > 180) {
+                            Log.e("GeoPoint", "Invalid coordinates for: " + owner.getEv_station_name());
+                            continue;
+                        }
                         // Add marker for registered station
                         Marker marker = map.addMarker(new MarkerOptions()
                                 .position(stationLocation)
