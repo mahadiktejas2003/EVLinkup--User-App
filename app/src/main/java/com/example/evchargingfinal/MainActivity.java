@@ -267,7 +267,6 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         }
     }
 
-
     private void showNearbyStationBottomSheet(String stationName) {
         NearbyStation station = null;
         for (Map.Entry<String, NearbyStation> entry : nearbyStations.entrySet()) {
