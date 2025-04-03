@@ -1,13 +1,13 @@
 {
   "project_info": {
-    "project_number": "230018787026",
-    "project_id": "ev-linkup-project",
-    "storage_bucket": "ev-linkup-project.firebasestorage.app"
+    "project_number": "728902626426",
+    "project_id": "ev-linkup-project-52805",
+    "storage_bucket": "ev-linkup-project-52805.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:230018787026:android:f724327e96d4b283826f0b",
+        "mobilesdk_app_id": "1:728902626426:android:1ac72cb9d5d83e65435fc3",
         "android_client_info": {
           "package_name": "com.example.evchargingfinal"
         }
@@ -15,7 +15,7 @@
       "oauth_client": [],
       "api_key": [
         {
-          "current_key": "AIzaSyDi5ct2AOcZ40pcWHoKGw0xoTB_Zt5dFQg"
+          "current_key": "AIzaSyCk9EjJ2Wwy4z7j7k5DKwLi9-TD0AYmtco"
         }
       ],
       "services": {
