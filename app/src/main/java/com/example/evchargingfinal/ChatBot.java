@@ -23,7 +23,7 @@ public class ChatBot extends AppCompatActivity {
         webView.setWebViewClient(new WebViewClient());
 
         // Load a URL into the WebView
-        webView.loadUrl("https://ecoviewproperties.in/PCCOE/index.html");
+        webView.loadUrl("http://192.168.31.137:3000"); //previously here-webView.loadUrl("https://ecoviewproperties.in/PCCOE/index.html");
 
     }
 }
