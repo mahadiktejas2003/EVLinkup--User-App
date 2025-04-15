@@ -3,9 +3,13 @@ package com.example.evchargingfinal;
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.cardview.widget.CardView;
+import androidx.core.app.ActivityCompat;
 
 import android.content.Intent;
+import android.content.pm.PackageManager;
+import android.location.Location;
 import android.os.Bundle;
+import android.telephony.SmsManager;
 import android.util.Log;
 import android.view.MotionEvent;
 import android.view.View;
@@ -18,12 +22,15 @@ import com.example.evchargingfinal.databinding.ActivityDashboardBinding;
 import com.example.evchargingfinal.databinding.ActivityMainBinding;
 import com.example.evchargingfinal.envo_impact.EnviromentalImpactActivity;
 import com.example.evchargingfinal.profile.ProfileActivity;
+import com.google.android.gms.location.FusedLocationProviderClient;
+import com.google.android.gms.location.LocationServices;
 import com.google.android.gms.tasks.OnFailureListener;
 import com.google.android.gms.tasks.OnSuccessListener;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.messaging.FirebaseMessaging;
+import android.Manifest;
 
 public class Dashboard extends AppCompatActivity {
     private Owner owner;
@@ -33,7 +40,9 @@ public class Dashboard extends AppCompatActivity {
     private FirebaseFirestore firebaseFirestore;
     private int check = 1;
 
+
     private ActivityDashboardBinding binding;
+    private FusedLocationProviderClient fusedLocationClient;
     EditText token;
 
     @Override
@@ -44,6 +53,7 @@ public class Dashboard extends AppCompatActivity {
 
         firebaseAuth = FirebaseAuth.getInstance();
         firebaseFirestore = FirebaseFirestore.getInstance();
+        fusedLocationClient = LocationServices.getFusedLocationProviderClient(this);
 //        token = findViewById(R.id.token);
 
         LinearLayout lat = findViewById(R.id.chatbot);
@@ -75,7 +85,66 @@ public class Dashboard extends AppCompatActivity {
 
         setEventLis();
 
+        // SOS Button Listener (New Addition)
+        binding.fabSos.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if (ActivityCompat.checkSelfPermission(Dashboard.this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+                    ActivityCompat.requestPermissions(Dashboard.this, new String[]{Manifest.permission.ACCESS_FINE_LOCATION}, 1);
+                    return;
+                }
+                getLastKnownLocation();
+            }
+        });
+
         setContentView(binding.getRoot());
+    }
+    // New Method: Fetch User's Last Known Location
+    private void getLastKnownLocation() {
+        try {
+            fusedLocationClient.getLastLocation()
+                    .addOnSuccessListener(new OnSuccessListener<Location>() {
+                        @Override
+                        public void onSuccess(Location location) {
+                            if (location != null) {
+                                double latitude = location.getLatitude();
+                                double longitude = location.getLongitude();
+                                sendSOSMessage(latitude, longitude);
+                            } else {
+                                Toast.makeText(Dashboard.this, "Location not available", Toast.LENGTH_SHORT).show();
+                            }
+                        }
+                    });
+        } catch (SecurityException e) {
+            Toast.makeText(Dashboard.this, "Permission not granted: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    // New Method: Send SOS Message with Location
+    private void sendSOSMessage(double latitude, double longitude) {
+        String sosMessage = "I need help! My current location is: https://www.google.com/maps/search/?api=1&query=" + latitude + "," + longitude;
+
+        // Predefined contacts (phone numbers)
+        String[] contacts = {"+918275034765", "+0987654321"}; // Replace with actual contact numbers
+
+        for (String contact : contacts) {
+            if (ActivityCompat.checkSelfPermission(this, Manifest.permission.SEND_SMS) != PackageManager.PERMISSION_GRANTED) {
+                ActivityCompat.requestPermissions(Dashboard.this, new String[]{Manifest.permission.SEND_SMS}, 2);
+                return;
+            }
+            sendSMS(contact, sosMessage);
+        }
+    }
+
+    // New Method: Send SMS
+    private void sendSMS(String phoneNumber, String message) {
+        try {
+            SmsManager smsManager = SmsManager.getDefault();
+            smsManager.sendTextMessage(phoneNumber, null, message, null, null);
+            Toast.makeText(this, "SOS message sent to " + phoneNumber, Toast.LENGTH_SHORT).show();
+        } catch (Exception e) {
+            Toast.makeText(this, "Failed to send SOS message: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+        }
     }
 
     private void goToRating() {
@@ -286,5 +355,17 @@ public class Dashboard extends AppCompatActivity {
 
 //        Toast.makeText(this, "calll herer", Toast.LENGTH_SHORT).show();
 
+    }
+    // Permission Request Callback (New Addition)
+    @Override
+    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        if (requestCode == 1 && grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+            getLastKnownLocation(); // Proceed after location permission is granted
+        } else if (requestCode == 2 && grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+            Toast.makeText(this, "Permission granted to send SMS", Toast.LENGTH_SHORT).show();
+        } else {
+            Toast.makeText(this, "Permission denied", Toast.LENGTH_SHORT).show();
+        }
     }
 }

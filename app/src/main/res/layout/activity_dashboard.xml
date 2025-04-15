@@ -366,8 +366,8 @@
 
     <LinearLayout
         android:id="@+id/chatbot"
-        android:layout_width="120dp"
-        android:layout_height="120dp"
+        android:layout_width="100dp"
+        android:layout_height="100dp"
         android:layout_alignParentBottom="true"
         android:layout_alignParentEnd="true"
         android:layout_marginBottom="20dp"
@@ -384,6 +384,18 @@
             app:lottie_fileName="aibot.json" />
 
     </LinearLayout>
-
-
+    <!-- SOS FAB Button -->
+    <com.google.android.material.floatingactionbutton.FloatingActionButton
+        android:id="@+id/fab_sos"
+        android:layout_width="120dp"
+        android:layout_height="120dp"
+        android:layout_above="@id/chatbot"
+        android:layout_alignParentEnd="true"
+        android:layout_marginBottom="10dp"
+        android:layout_marginEnd="20dp"
+        android:src="@drawable/ic_sos"
+        android:backgroundTint="@color/red"
+        android:tint="@color/white"
+        app:fabSize="normal"
+        app:maxImageSize="34dp" />
 </RelativeLayout>
