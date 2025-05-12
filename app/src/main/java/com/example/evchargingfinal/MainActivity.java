@@ -7,11 +7,13 @@ import android.graphics.Color;
 import android.location.Address;
 import android.location.Geocoder;
 import android.location.Location;
+import android.location.LocationManager;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.ResultReceiver;
+import android.provider.Settings;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -100,15 +102,70 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         }
 
         init();
+
+        // Ensure GPS is enabled
+        if (!isGPSEnabled()) {
+            promptEnableGPS();
+        }
+
+        // Start dynamic location updates
+        startLocationUpdates();
+    }
+
+    private boolean isGPSEnabled() {
+        LocationManager locationManager = (LocationManager) getSystemService(LOCATION_SERVICE);
+        return locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER);
+    }
+
+    private void promptEnableGPS() {
+        Intent intent = new Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS);
+        startActivity(intent);
+    }
+
+    private void startLocationUpdates() {
+        LocationRequest locationRequest = LocationRequest.create();
+        locationRequest.setInterval(5000); // 5 seconds
+        locationRequest.setFastestInterval(2000); // 2 seconds
+        locationRequest.setPriority(LocationRequest.PRIORITY_HIGH_ACCURACY);
+
+        LocationCallback locationCallback = new LocationCallback() {
+            @Override
+            public void onLocationResult(@NonNull LocationResult locationResult) {
+                Location location = locationResult.getLastLocation();
+                if (location != null) {
+                    lati = location.getLatitude();
+                    longi = location.getLongitude();
+                    userlocation = new LatLng(lati, longi);
+
+                    // Update map camera only if it's the first location update
+                    if (map != null && map.getCameraPosition().zoom < 12f) {
+                        map.moveCamera(CameraUpdateFactory.newLatLng(userlocation));
+                        map.animateCamera(CameraUpdateFactory.zoomTo(15f));
+                    }
+                }
+            }
+        };
+
+        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
+            fusedLocationClient.requestLocationUpdates(locationRequest, locationCallback, Looper.getMainLooper());
+        }
     }
 
     @Override
     public void onMapReady(@NonNull GoogleMap googleMap) {
         map = googleMap;
 
+        // Enable the My Location layer (blue dot)
+        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
+            map.setMyLocationEnabled(true);
+        } else {
+            ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.ACCESS_FINE_LOCATION}, LOCATION_PERMISSION_REQUEST_CODE);
+        }
+
         LatLng latLng = new LatLng(18.447265, 73.858926);
         userlocation = latLng;
 
+        // Remove camera movement logic from marker click listener
         map.setOnMarkerClickListener(marker -> {
             if (marker.getTag() != null) {
                 if (marker.getTag().equals("current_location")) {
@@ -121,6 +178,7 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
             return false;
         });
     }
+
 
     public void getCurrentLocation1() {
         if (ContextCompat.checkSelfPermission(getApplicationContext(),
@@ -139,12 +197,26 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
         if (requestCode == LOCATION_PERMISSION_REQUEST_CODE && grantResults.length > 0) {
             if (grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                if (map != null) {
+                    if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED && ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+                        // TODO: Consider calling
+                        //    ActivityCompat#requestPermissions
+                        // here to request the missing permissions, and then overriding
+                        //   public void onRequestPermissionsResult(int requestCode, String[] permissions,
+                        //                                          int[] grantResults)
+                        // to handle the case where the user grants the permission. See the documentation
+                        // for ActivityCompat#requestPermissions for more details.
+                        return;
+                    }
+                    map.setMyLocationEnabled(true); // Enable My Location layer if permission is granted
+                }
                 getCurrentLocation();
             } else {
                 Toast.makeText(this, "Permission is denied!", Toast.LENGTH_SHORT).show();
             }
         }
     }
+
 
     private void getCurrentLocation() {
         LocationRequest locationRequest = new LocationRequest();
@@ -177,6 +249,7 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
                     currentLocationMarker.setTag("current_location");
                 }
 
+                // Add circles around the user's location
                 map.addCircle(new CircleOptions()
                         .center(userlocation)
                         .radius(1000)
@@ -190,15 +263,19 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
                         .strokeColor(Color.BLUE)
                         .fillColor(Color.argb(20, 0, 0, 20)));
 
-                map.moveCamera(CameraUpdateFactory.newLatLng(userlocation));
-                map.moveCamera(CameraUpdateFactory.zoomTo(12f));
-                map.animateCamera(CameraUpdateFactory.zoomTo(12f));
+                // Move camera only during initialization
+                if (map.getCameraPosition().zoom < 12f) {
+                    map.moveCamera(CameraUpdateFactory.newLatLng(userlocation));
+                    map.moveCamera(CameraUpdateFactory.zoomTo(12f));
+                    map.animateCamera(CameraUpdateFactory.zoomTo(12f));
+                }
 
                 getData1();
                 fetchNearbyStations();
             }
         });
     }
+
 
     private void fetchNearbyStations() {
         String apiKey = getString(R.string.google_maps_api_key);
@@ -209,6 +286,9 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         searchQueries.add("ev_charging");
         searchQueries.add("charging_station");
         searchQueries.add("electric_car_charging");
+
+        // Clear existing markers before adding new ones
+        map.clear();
 
         for (String query : searchQueries) {
             executor.execute(() -> {
@@ -367,12 +447,17 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
                         Log.d(TAG, "Fetched EV stations: " + evStations.size());
                         for (EVStation station : evStations) {
                             Log.d(TAG, "Station: " + station.getEvs_id() + ", Energy: " + station.getEvs_energy());
-                            if (station.getEvs_energy() > (allowner.getPrice() * 30)) {
+                            int requiredEnergy = allowner.getPrice() * 30;
+                            Log.d(TAG, "Required Energy: " + requiredEnergy);
+                            if (station.getEvs_energy() > requiredEnergy) {
+                                Log.d(TAG, "Proceeding with booking for station: " + station.getEvs_id());
                                 Intent intent = new Intent(MainActivity.this, BookSlot.class);
                                 intent.putExtra("owner_email", allowner.getOwner_email());
                                 intent.putExtra("price", allowner.getPrice() + "");
                                 intent.putExtra("owner_name", allowner.getOwner_name());
                                 startActivity(intent);
+                            } else {
+                                Log.d(TAG, "Station " + station.getEvs_id() + " does not have enough energy.");
                             }
                         }
                     })

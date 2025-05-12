@@ -9,8 +9,11 @@ import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.location.Location;
+import android.location.LocationManager;
 import android.os.Bundle;
+import android.provider.Settings;
 import android.telephony.SmsManager;
+import android.view.View;
 import android.widget.Toast;
 
 import com.example.evchargingfinal.databinding.ActivityDashboardBinding;
@@ -50,6 +53,11 @@ public class Dashboard extends AppCompatActivity {
         setupLocationCallback();
         setEventLis();
 
+        // Ensure GPS is enabled
+        if (!isGPSEnabled()) {
+            promptEnableGPS();
+        }
+
         // SOS Button Listener
         binding.fabSos.setOnClickListener(v -> {
             if (isSosInProgress) {
@@ -66,6 +74,16 @@ public class Dashboard extends AppCompatActivity {
 
         // Navigate to SOS screen
         binding.btnManageSos.setOnClickListener(v -> startActivity(new Intent(this, SosActivity.class)));
+    }
+
+    private boolean isGPSEnabled() {
+        LocationManager locationManager = (LocationManager) getSystemService(LOCATION_SERVICE);
+        return locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER);
+    }
+
+    private void promptEnableGPS() {
+        Intent intent = new Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS);
+        startActivity(intent);
     }
 
     private void setupLocationRequest() {
@@ -157,6 +175,11 @@ public class Dashboard extends AppCompatActivity {
 
         // Handle "Find Near Station" module
         binding.btnViewStationsLinearLayout.setOnClickListener(view -> {
+            if (!isGPSEnabled()) {
+                Toast.makeText(this, "Please enable GPS to find nearby stations.", Toast.LENGTH_SHORT).show();
+                promptEnableGPS();
+                return;
+            }
             if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
                 Toast.makeText(this, "Location permission not granted. Please enable it in settings.", Toast.LENGTH_SHORT).show();
                 return;
@@ -176,5 +199,16 @@ public class Dashboard extends AppCompatActivity {
                     })
                     .addOnFailureListener(e -> Toast.makeText(this, "Failed to fetch location: " + e.getMessage(), Toast.LENGTH_SHORT).show());
         });
+
+        // Add this block for History button
+        binding.Historys.setOnClickListener(view -> {
+            startActivity(new Intent(this, GetAllHistoryActivity.class));
+        });
+    }
+
+    public void ChatBot(View view) {
+        Intent intent = new Intent(this, ChatBot.class);
+        startActivity(intent);
     }
 }
+

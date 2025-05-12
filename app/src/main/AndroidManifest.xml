@@ -23,9 +23,6 @@
         <activity
             android:name=".GetAllHistoryActivity"
             android:exported="true" >
-
-
-
         </activity>
         <activity
             android:name=".ChatBot"

@@ -44,6 +44,6 @@ public class ChatBot extends AppCompatActivity {
         });
 
         // Load the ngrok URL
-        webView.loadUrl("https://166b-2401-4900-8fc9-b50d-4cad-9245-295e-9f79.ngrok-free.app/chatbot/e17b4354-4cec-42e1-82c7-06a7879d63b9");
+        webView.loadUrl("https://cf5b-2401-4900-8fc9-b50d-4cad-9245-295e-9f79.ngrok-free.app/chatbot/e17b4354-4cec-42e1-82c7-06a7879d63b9");
     }
 }
