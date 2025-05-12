@@ -177,7 +177,7 @@
 
                 <!-- Card 1 -->
                 <LinearLayout
-                    android:id="@+id/btnViewStations"
+                    android:id="@+id/btnViewStationsLinearLayout"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_margin="8dp"
@@ -354,7 +354,12 @@
 
                 </LinearLayout>
 
-
+                <Button
+                    android:id="@+id/btnManageSos"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Manage SOS"
+                    android:layout_marginTop="16dp" />
 
 
             </LinearLayout>

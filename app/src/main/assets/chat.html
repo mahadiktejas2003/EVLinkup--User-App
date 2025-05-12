@@ -1,0 +1,27 @@
+<!doctype html>
+<html>
+<head>
+    <meta charset="utf-8" />
+
+    <!-- Load the real Flowise chat widget UMD bundle -->
+    <script src="https://cdn.jsdelivr.net/npm/flowise-chat-widget@latest/dist/index.umd.min.js"></script>
+
+    <style>
+        html, body, #chat-container {
+          margin:0; padding:0; height:100%; width:100%;
+        }
+    </style>
+</head>
+<body>
+<div id="chat-container"></div>
+
+<script>
+    FlowiseChatWidget.init({
+      host:  "https://166b-2401-4900-8fc9-b50d-4cad-9245-295e-9f79.ngrok-free.app",
+      botId: "e17b4354-4cec-42e1-82c7-06a7879d63b9",
+      container: "#chat-container",
+      title: "EVCharge Bot"
+    });
+</script>
+</body>
+</html>
