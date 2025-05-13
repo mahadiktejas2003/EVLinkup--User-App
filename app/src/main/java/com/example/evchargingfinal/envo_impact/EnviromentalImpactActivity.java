@@ -4,7 +4,11 @@ import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.recyclerview.widget.LinearLayoutManager;
 
+import android.content.Intent;
+import android.graphics.Bitmap;
+import android.net.Uri;
 import android.os.Bundle;
+import android.os.Environment;
 import android.util.Log;
 import android.view.View;
 import android.widget.TextView;
@@ -22,6 +26,8 @@ import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.firestore.QuerySnapshot;
 
 
+import java.io.File;
+import java.io.FileOutputStream;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
@@ -125,7 +131,41 @@ public class EnviromentalImpactActivity extends AppCompatActivity {
     }
 
     private void setEventLis() {
+        binding.btnShare.setOnClickListener(v -> shareScreenshot());
 
+    }
+    private void shareScreenshot() {
+        try {
+            // Capture the screenshot
+            View rootView = getWindow().getDecorView().getRootView();
+            rootView.setDrawingCacheEnabled(true);
+            Bitmap bitmap = Bitmap.createBitmap(rootView.getDrawingCache());
+            rootView.setDrawingCacheEnabled(false);
+
+            // Save the screenshot to a file
+            File screenshotFile = new File(getExternalFilesDir(Environment.DIRECTORY_PICTURES), "env_impact_screenshot.png");
+            FileOutputStream fos = new FileOutputStream(screenshotFile);
+            bitmap.compress(Bitmap.CompressFormat.PNG, 100, fos);
+            fos.flush();
+            fos.close();
+
+            // Use FileProvider to get a content URI
+            Uri screenshotUri = androidx.core.content.FileProvider.getUriForFile(
+                    this,
+                    getApplicationContext().getPackageName() + ".provider",
+                    screenshotFile
+            );
+
+            // Share the screenshot
+            Intent shareIntent = new Intent(Intent.ACTION_SEND);
+            shareIntent.setType("image/png");
+            shareIntent.putExtra(Intent.EXTRA_STREAM, screenshotUri);
+            shareIntent.putExtra(Intent.EXTRA_TEXT, "Check out my Environmental Impact achievements!");
+            shareIntent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+            startActivity(Intent.createChooser(shareIntent, "Share via"));
+        } catch (Exception e) {
+            Toast.makeText(this, "Failed to share screenshot: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+        }
     }
 
     private void init() {
